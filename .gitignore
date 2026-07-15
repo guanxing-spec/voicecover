@@ -1,0 +1,22 @@
+# 只允许 voicecover/ 和 RVC/
+/*
+!/.gitignore
+!/voicecover
+!/RVC
+
+# voicecover
+voicecover/venv/
+voicecover/static/uploads/*
+voicecover/outputs/*
+voicecover/**/__pycache__/
+
+# RVC
+RVC/**/__pycache__/
+
+# common
+**/*.pyc
+**/.env
+**/__pycache__/
+*.egg-info/
+.DS_Store
+Thumbs.db
