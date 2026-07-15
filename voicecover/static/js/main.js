@@ -45,6 +45,10 @@ async function handleFile(file) {
             document.getElementById('fileName').textContent =
                 `${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
             document.getElementById('fileInfo').classList.remove('hidden');
+            // 显示原音频播放器
+            const player = document.getElementById('originalPlayer');
+            player.src = data.data.url;
+            document.getElementById('originalPlayerWrapper').classList.remove('hidden');
             updateConvertButton();
         } else {
             alert('上传失败: ' + data.message);
@@ -57,6 +61,8 @@ async function handleFile(file) {
 function removeFile() {
     uploadedFile = null;
     document.getElementById('fileInfo').classList.add('hidden');
+    document.getElementById('originalPlayerWrapper').classList.add('hidden');
+    document.getElementById('originalPlayer').src = '';
     document.getElementById('audioInput').value = '';
     updateConvertButton();
 }
@@ -75,15 +81,13 @@ function updateConvertButton() {
 }
 
 // ===== 高级设置 =====
-function toggleSettings() {
-    const content = document.getElementById('settingsContent');
-    const arrow = document.getElementById('settingsArrow');
-    content.classList.toggle('open');
-    arrow.textContent = content.classList.contains('open') ? '▲' : '▼';
-}
-
 function updatePitchLabel() {
     document.getElementById('pitchLabel').textContent = document.getElementById('pitch').value;
+}
+
+function setPitch(val) {
+    document.getElementById('pitch').value = val;
+    updatePitchLabel();
 }
 
 // ===== 音色翻页和搜索 =====

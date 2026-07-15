@@ -38,6 +38,9 @@
             <span>🎵 <span id="fileName"></span></span>
             <button onclick="removeFile()">❌ 移除</button>
         </div>
+        <div id="originalPlayerWrapper" class="original-player hidden">
+            <audio id="originalPlayer" controls></audio>
+        </div>
 
         <!-- 音色选择 -->
         <section class="voice-section">
@@ -70,15 +73,20 @@
 
         <!-- 高级设置 -->
         <section class="settings-section">
-            <div class="settings-header" onclick="toggleSettings()">
-                <span>⚙️ 高级设置</span>
-                <span id="settingsArrow">▼</span>
+            <div class="settings-header">
+                <span>⚙️ 音调与输出设置</span>
             </div>
-            <div class="settings-content" id="settingsContent">
+            <div class="settings-body">
                 <div class="setting-item">
                     <label>🎚️ 音调调整</label>
                     <input type="range" id="pitch" min="-12" max="12" value="0" oninput="updatePitchLabel()">
                     <span id="pitchLabel">0</span>
+                </div>
+                <div class="pitch-presets">
+                    <span>快捷预设：</span>
+                    <button onclick="setPitch(-8)">女变男 (-8)</button>
+                    <button onclick="setPitch(8)">男变女 (+8)</button>
+                    <button onclick="setPitch(0)">还原 (0)</button>
                 </div>
                 <div class="setting-item">
                     <label>🔊 分离原曲伴奏并自动混音</label>

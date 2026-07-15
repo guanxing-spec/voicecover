@@ -37,7 +37,7 @@ def upload():
 
     return jsonify({
         'status': 'success',
-        'data': {'file_path': filepath, 'filename': file.filename}
+        'data': {'file_path': filepath, 'filename': file.filename, 'url': f'/static/uploads/{filename}'}
     })
 
 

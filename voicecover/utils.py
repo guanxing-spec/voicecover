@@ -28,6 +28,11 @@ VOICE_NAME_MAP = {
     'qiqi': '绮绮',
     'wuwu': '雾雾',
     'azi': '阿梓',
+    # 新下载
+    'himemiya_rie': '姫宫莉耶',
+    'nitya_nil': '尼娅',
+    'smart_falcon': '聪明雀',
+    'nitta': '新田（男声）',
 }
 
 REVERSE_NAME_MAP = {v: k for k, v in VOICE_NAME_MAP.items()}
