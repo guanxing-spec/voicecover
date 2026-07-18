@@ -1,10 +1,22 @@
 from flask import Flask, render_template, request, jsonify, send_file, make_response
 import os
-from config import UPLOAD_DIR, OUTPUT_DIR
+from config import UPLOAD_DIR, OUTPUT_DIR, SEPARATION_DIR
 from utils import get_voice_models, cleanup_old_files
-from tasks import start_conversion, get_task_status
+from tasks import start_conversion, get_task_status, start_separation_task, get_separation_task_status
 
 app = Flask(__name__)
+
+ALLOWED_PATHS = [
+    os.path.abspath(UPLOAD_DIR),
+    os.path.abspath(SEPARATION_DIR),
+    os.path.abspath(OUTPUT_DIR),
+]
+
+
+def _is_safe_path(path):
+    """验证文件路径在允许的目录内，防止路径穿越"""
+    real = os.path.abspath(os.path.realpath(path))
+    return any(real.startswith(base + os.sep) or real == base for base in ALLOWED_PATHS)
 
 
 @app.route('/')
@@ -47,6 +59,8 @@ def convert():
     file_path = data.get('file_path')
     model_name = data.get('model')
     pitch = int(data.get('pitch', 0))
+    vocal_path = data.get('vocal_path')
+    output_format = data.get('format', 'mp3').lower()
 
     if not file_path or not model_name:
         return jsonify({'status': 'error', 'message': '缺少参数'}), 400
@@ -54,8 +68,63 @@ def convert():
     if not os.path.exists(file_path):
         return jsonify({'status': 'error', 'message': '文件不存在'}), 404
 
-    task_id = start_conversion(file_path, model_name, pitch)
+    if not _is_safe_path(file_path):
+        return jsonify({'status': 'error', 'message': '非法的文件路径'}), 400
+
+    if output_format not in ('wav', 'mp3', 'flac'):
+        output_format = 'mp3'
+
+    if vocal_path and not _is_safe_path(vocal_path):
+        return jsonify({'status': 'error', 'message': '非法的音频路径'}), 400
+
+    task_id = start_conversion(file_path, model_name, pitch, vocal_path=vocal_path, output_format=output_format)
     return jsonify({'status': 'success', 'data': {'task_id': task_id}})
+
+
+@app.route('/separate', methods=['POST'])
+def separate():
+    data = request.get_json() or request.form
+    file_path = data.get('file_path')
+    sep_model = data.get('sep_model', 'htdemucs')
+    output_format = data.get('output_format', 'WAV').upper()
+
+    if not file_path:
+        return jsonify({'status': 'error', 'message': '缺少参数'}), 400
+
+    if not os.path.exists(file_path):
+        return jsonify({'status': 'error', 'message': '文件不存在'}), 404
+
+    if not _is_safe_path(file_path):
+        return jsonify({'status': 'error', 'message': '非法的文件路径'}), 400
+
+    if sep_model not in ('htdemucs', 'kim_vocal_2'):
+        return jsonify({'status': 'error', 'message': '不支持的分离模型'}), 400
+
+    if output_format not in ('WAV', 'MP3', 'FLAC'):
+        return jsonify({'status': 'error', 'message': '不支持的输出格式'}), 400
+
+    task_id = start_separation_task(file_path, model_type=sep_model, output_format=output_format)
+    return jsonify({'status': 'success', 'data': {'task_id': task_id}})
+
+
+@app.route('/separation-status/<task_id>', methods=['GET'])
+def separation_status(task_id):
+    return jsonify({'status': 'success', 'data': get_separation_task_status(task_id)})
+
+
+@app.route('/separation-download/<task_id>/<stem_type>', methods=['GET'])
+def separation_download(task_id, stem_type):
+    info = get_separation_task_status(task_id)
+    if info.get('status') != 'completed':
+        return jsonify({'status': 'error', 'message': '分离未完成'}), 400
+
+    stem_path = info.get('vocal_path') if stem_type == 'vocal' else info.get('inst_path')
+    if not stem_path or not os.path.exists(stem_path):
+        return jsonify({'status': 'error', 'message': '文件不存在'}), 404
+
+    response = make_response(send_file(stem_path, as_attachment=False))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
 
 
 @app.route('/status/<task_id>', methods=['GET'])
@@ -88,4 +157,4 @@ def manual_cleanup():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)

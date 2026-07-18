@@ -10,6 +10,8 @@ RVC_INFER_CLI = os.path.join(RVC_DIR, 'run_infer.py')
 VENV_PYTHON = os.path.join(BASE_DIR, 'venv', 'Scripts', 'python.exe')
 UPLOAD_DIR = os.path.join(BASE_DIR, 'static', 'uploads')
 OUTPUT_DIR = os.path.join(BASE_DIR, 'outputs')
+SEPARATION_DIR = os.path.join(BASE_DIR, 'separated')
+MODELS_DIR = os.path.join(BASE_DIR, 'models')
 
-for d in [UPLOAD_DIR, OUTPUT_DIR]:
+for d in [UPLOAD_DIR, OUTPUT_DIR, SEPARATION_DIR, MODELS_DIR]:
     os.makedirs(d, exist_ok=True)

@@ -42,6 +42,67 @@
             <audio id="originalPlayer" controls></audio>
         </div>
 
+        <!-- 人声分离 -->
+        <section class="separate-section" id="separateSection">
+            <div class="sep-model-selector">
+                <span class="sep-model-label">🔊 分离模型：</span>
+                <label class="sep-model-option">
+                    <input type="radio" name="sep_model" value="htdemucs" onchange="updateSeparateButton()">
+                    HTDemucs
+                </label>
+                <label class="sep-model-option">
+                    <input type="radio" name="sep_model" value="kim_vocal_2" checked onchange="updateSeparateButton()">
+                    Kim Vocal 2（正版 Mel-Band-RoFormer）
+                </label>
+            </div>
+            <div class="sep-model-selector" style="margin-top:8px">
+                <span class="sep-model-label">📁 输出格式：</span>
+                <label class="sep-model-option">
+                    <input type="radio" name="sep_output_format" value="WAV" checked onchange="updateSeparateButton()">
+                    WAV
+                </label>
+                <label class="sep-model-option">
+                    <input type="radio" name="sep_output_format" value="MP3" onchange="updateSeparateButton()">
+                    MP3
+                </label>
+                <label class="sep-model-option">
+                    <input type="radio" name="sep_output_format" value="FLAC" onchange="updateSeparateButton()">
+                    FLAC
+                </label>
+                <span style="margin-left: 12px; font-size: 12px; color: #888;">WAV 无损 / MP3 省空间</span>
+            </div>
+            <button class="separate-btn" id="separateBtn" onclick="startSeparate()" disabled>
+                🎛️ 分离人声与伴奏
+            </button>
+        </section>
+
+        <!-- 分离进度 -->
+        <section class="progress-section hidden" id="sepProgressSection">
+            <p>⏳ <span id="sepStatusText">准备分离...</span></p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="sepProgressFill" style="width: 0%"></div>
+            </div>
+            <p id="sepProgressPercent">0%</p>
+        </section>
+
+        <!-- 分离结果 -->
+        <section class="separate-result hidden" id="sepResultSection">
+            <h3>✅ 分离完成！</h3>
+            <p class="sep-hint">试听满意后，选择音色开始翻唱</p>
+            <div class="sep-stems">
+                <div class="sep-stem-card">
+                    <div class="sep-stem-label">🎤 人声</div>
+                    <audio class="sep-player" id="vocalPlayer" controls></audio>
+                    <a class="sep-download-btn" id="vocalDownloadLink" href="#" download>💾 下载人声</a>
+                </div>
+                <div class="sep-stem-card">
+                    <div class="sep-stem-label">🎹 伴奏</div>
+                    <audio class="sep-player" id="instPlayer" controls></audio>
+                    <a class="sep-download-btn" id="instDownloadLink" href="#" download>💾 下载伴奏</a>
+                </div>
+            </div>
+        </section>
+
         <!-- 音色选择 -->
         <section class="voice-section">
             <h2>🎭 选择音色（点击卡片选中）</h2>
@@ -87,10 +148,6 @@
                     <button onclick="setPitch(-8)">女变男 (-8)</button>
                     <button onclick="setPitch(8)">男变女 (+8)</button>
                     <button onclick="setPitch(0)">还原 (0)</button>
-                </div>
-                <div class="setting-item">
-                    <label>🔊 分离原曲伴奏并自动混音</label>
-                    <input type="checkbox" id="separateVocal" checked>
                 </div>
                 <div class="setting-item">
                     <label>📁 输出格式</label>

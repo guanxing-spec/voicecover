@@ -2,6 +2,10 @@ let selectedVoice = null;
 let uploadedFile = null;
 let currentTaskId = null;
 let pollInterval = null;
+let separationTaskId = null;
+let separatedVocalPath = null;
+let separatedInstPath = null;
+let sepPollInterval = null;
 
 // ===== 上传区交互 =====
 const dropZone = document.getElementById('dropZone');
@@ -49,6 +53,8 @@ async function handleFile(file) {
             const player = document.getElementById('originalPlayer');
             player.src = data.data.url;
             document.getElementById('originalPlayerWrapper').classList.remove('hidden');
+            resetSeparation();
+            updateSeparateButton();
             updateConvertButton();
         } else {
             alert('上传失败: ' + data.message);
@@ -64,7 +70,21 @@ function removeFile() {
     document.getElementById('originalPlayerWrapper').classList.add('hidden');
     document.getElementById('originalPlayer').src = '';
     document.getElementById('audioInput').value = '';
+    resetSeparation();
     updateConvertButton();
+}
+
+function resetSeparation() {
+    if (sepPollInterval) {
+        clearInterval(sepPollInterval);
+        sepPollInterval = null;
+    }
+    separationTaskId = null;
+    separatedVocalPath = null;
+    separatedInstPath = null;
+    document.getElementById('sepProgressSection').classList.add('hidden');
+    document.getElementById('sepResultSection').classList.add('hidden');
+    document.getElementById('separateBtn').disabled = true;
 }
 
 // ===== 音色选择 =====
@@ -80,6 +100,23 @@ function updateConvertButton() {
     btn.disabled = !(uploadedFile && selectedVoice);
 }
 
+function updateSeparateButton() {
+    document.getElementById('separateBtn').disabled = !uploadedFile;
+}
+
+// 分离模型选择高亮
+document.addEventListener('DOMContentLoaded', () => {
+    initPagination();
+    document.querySelectorAll('.sep-model-option').forEach(el => {
+        const radio = el.querySelector('input[type="radio"]');
+        if (radio && radio.checked) el.classList.add('selected');
+        el.addEventListener('click', () => {
+            document.querySelectorAll('.sep-model-option').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+        });
+    });
+});
+
 // ===== 高级设置 =====
 function updatePitchLabel() {
     document.getElementById('pitchLabel').textContent = document.getElementById('pitch').value;
@@ -88,6 +125,113 @@ function updatePitchLabel() {
 function setPitch(val) {
     document.getElementById('pitch').value = val;
     updatePitchLabel();
+}
+
+// ===== 人声分离 =====
+async function startSeparate() {
+    if (!uploadedFile) return;
+
+    if (sepPollInterval) {
+        clearInterval(sepPollInterval);
+        sepPollInterval = null;
+    }
+
+    const btn = document.getElementById('separateBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 分离中...';
+
+    // 获取选中的分离模型和输出格式
+    const sepModelRadio = document.querySelector('input[name="sep_model"]:checked');
+    const sepModel = sepModelRadio ? sepModelRadio.value : 'htdemucs';
+    const fmtRadio = document.querySelector('input[name="sep_output_format"]:checked');
+    const outputFormat = fmtRadio ? fmtRadio.value : 'WAV';
+
+    // 隐藏旧结果
+    document.getElementById('sepResultSection').classList.add('hidden');
+    document.getElementById('sepProgressSection').classList.remove('hidden');
+    separationTaskId = null;
+
+    try {
+        const res = await fetch('/separate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                file_path: uploadedFile.file_path,
+                sep_model: sepModel,
+                output_format: outputFormat
+            })
+        });
+
+        const data = await res.json();
+        if (data.status !== 'success') {
+            alert('启动分离失败: ' + data.message);
+            btn.disabled = false;
+            btn.textContent = '🎛️ 分离人声与伴奏';
+            return;
+        }
+
+        separationTaskId = data.data.task_id;
+        sepPollInterval = setInterval(pollSeparationStatus, 2000);
+    } catch (err) {
+        alert('网络错误，请重试');
+        btn.disabled = false;
+        btn.textContent = '🎛️ 分离人声与伴奏';
+    }
+}
+
+async function pollSeparationStatus() {
+    const taskId = separationTaskId;
+    if (!taskId) return;
+
+    try {
+        const res = await fetch(`/separation-status/${taskId}`);
+        const data = await res.json();
+        const task = data.data;
+
+        document.getElementById('sepStatusText').textContent = task.message || '处理中...';
+        document.getElementById('sepProgressFill').style.width = task.progress + '%';
+        document.getElementById('sepProgressPercent').textContent = task.progress + '%';
+
+        if (task.status === 'completed') {
+            if (separationTaskId !== taskId) return;
+            clearInterval(sepPollInterval);
+            sepPollInterval = null;
+
+            separatedVocalPath = task.vocal_path;
+            separatedInstPath = task.inst_path;
+
+            document.getElementById('sepProgressSection').classList.add('hidden');
+            document.getElementById('separateBtn').textContent = '🎛️ 分离人声与伴奏';
+            showSeparationResult();
+        } else if (task.status === 'failed') {
+            if (separationTaskId !== taskId) return;
+            clearInterval(sepPollInterval);
+            sepPollInterval = null;
+            alert('分离失败: ' + (task.message || '未知错误'));
+            document.getElementById('sepProgressSection').classList.add('hidden');
+            document.getElementById('separateBtn').disabled = false;
+            document.getElementById('separateBtn').textContent = '🎛️ 分离人声与伴奏';
+        }
+    } catch (err) {
+        // 轮询失败暂不处理
+    }
+}
+
+function showSeparationResult() {
+    document.getElementById('sepResultSection').classList.remove('hidden');
+    document.getElementById('separateBtn').disabled = true;
+    document.getElementById('separateBtn').textContent = '✅ 已分离';
+
+    const ts = Date.now();
+    const vocalPlayer = document.getElementById('vocalPlayer');
+    vocalPlayer.src = `/separation-download/${separationTaskId}/vocal?_=${ts}`;
+    document.getElementById('vocalDownloadLink').href = `/separation-download/${separationTaskId}/vocal?_=${ts}`;
+
+    const instPlayer = document.getElementById('instPlayer');
+    instPlayer.src = `/separation-download/${separationTaskId}/inst?_=${ts}`;
+    document.getElementById('instDownloadLink').href = `/separation-download/${separationTaskId}/inst?_=${ts}`;
+
+    updateConvertButton();
 }
 
 // ===== 音色翻页和搜索 =====
@@ -156,13 +300,18 @@ async function startConvert() {
     currentTaskId = null;
 
     try {
+        const formatRadio = document.querySelector('input[name="format"]:checked');
+        const outputFormat = formatRadio ? formatRadio.value : 'mp3';
+
         const res = await fetch('/convert', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 file_path: uploadedFile.file_path,
                 model: selectedVoice,
-                pitch: parseInt(pitch)
+                pitch: parseInt(pitch),
+                vocal_path: separatedVocalPath || null,
+                format: outputFormat
             })
         });
 
@@ -264,4 +413,4 @@ function closeContact(e) {
     document.getElementById('contactModal').classList.add('hidden');
 }
 
-document.addEventListener('DOMContentLoaded', initPagination);
+

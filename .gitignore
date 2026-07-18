@@ -8,6 +8,8 @@
 voicecover/venv/
 voicecover/static/uploads/*
 voicecover/outputs/*
+voicecover/separated/*
+voicecover/models/hub/*
 voicecover/**/__pycache__/
 
 # RVC
