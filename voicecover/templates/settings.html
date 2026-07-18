@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - VoiceCover</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/settings.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-brand">VoiceCover</div>
+        <div class="nav-links">
+            <a href="/" class="nav-item">首页</a>
+            <a href="/settings" class="nav-item active">设置</a>
+            <a href="javascript:void(0)" class="nav-item" onclick="showContact()">联系作者</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>设置</h1>
+            <p>管理应用配置与存储文件</p>
+        </header>
+
+        <!-- 设置标签页 -->
+        <div class="settings-tabs">
+            <button class="settings-tab active">📁 音频预存</button>
+            <button class="settings-tab disabled" disabled>⚙️ 更多设置（待添加）</button>
+        </div>
+
+        <!-- 音频预存 -->
+        <section id="audioStorageSection">
+            <div class="storage-toolbar">
+                <label><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()"> 全选</label>
+                <button class="delete-selected-btn" id="deleteSelectedBtn" onclick="deleteSelected()" disabled>🗑️ 删除选中</button>
+                <span class="selected-count" id="selectedCount"></span>
+            </div>
+            <div id="fileCategories"></div>
+        </section>
+    </div>
+
+    <!-- 联系作者弹窗 -->
+    <div class="modal-overlay hidden" id="contactModal" onclick="closeContact(event)">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeContact()">&times;</button>
+            <h3>📬 联系作者</h3>
+            <div class="contact-info">
+                <p>GitHub: <a href="https://github.com/qinkadesu" target="_blank">github.com/qinkadesu</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showContact() {
+            document.getElementById('contactModal').classList.remove('hidden');
+        }
+        function closeContact(e) {
+            if (e && e.target !== e.currentTarget) return;
+            document.getElementById('contactModal').classList.add('hidden');
+        }
+    </script>
+    <script src="/static/js/settings.js"></script>
+</body>
+</html>

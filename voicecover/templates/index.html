@@ -12,6 +12,7 @@
         <div class="nav-brand">VoiceCover</div>
         <div class="nav-links">
             <a href="/" class="nav-item active">首页</a>
+            <a href="/settings" class="nav-item">设置</a>
             <a href="javascript:void(0)" class="nav-item" onclick="showContact()">联系作者</a>
         </div>
     </nav>
@@ -103,6 +104,52 @@
             </div>
         </section>
 
+        <!-- 翻唱音源选择 -->
+        <section class="convert-source-section">
+            <h2>🎤 配音翻唱</h2>
+            <div class="source-tabs">
+                <button class="source-tab active" id="sourceLocalBtn" onclick="selectConvertSource('local')">📁 本地音频</button>
+                <button class="source-tab" id="sourceSeparatedBtn" onclick="selectConvertSource('separated')">🎤 分离后人声</button>
+            </div>
+
+            <!-- 本地音频面板 -->
+            <div id="convertLocalPanel">
+                <div class="convert-upload-zone" id="convertDropZone">
+                    <div class="convert-upload-content">
+                        <p>📂 选择翻唱用的音频文件</p>
+                        <p class="upload-hint">点击或拖拽上传，支持 MP3 / WAV / FLAC / M4A，最大 50MB</p>
+                        <input type="file" id="convertAudioInput" accept=".mp3,.wav,.flac,.m4a" hidden>
+                    </div>
+                </div>
+                <div id="convertFileInfo" class="file-info hidden">
+                    <span>🎵 <span id="convertFileName"></span></span>
+                    <button onclick="removeConvertFile()">❌ 移除</button>
+                </div>
+                <div id="convertPlayerWrapper" class="original-player hidden">
+                    <audio id="convertPlayer" controls></audio>
+                </div>
+            </div>
+
+            <!-- 分离后人声面板 -->
+            <div id="convertVocalPanel" class="hidden">
+                <div id="vocalSourceAvailable" class="vocal-info-card hidden">
+                    <div class="vocal-info-icon">✅</div>
+                    <div class="vocal-info-text">
+                        <p>将使用分离后的人声进行翻唱</p>
+                        <p class="vocal-info-hint">来自刚才的人声分离结果</p>
+                    </div>
+                    <audio id="vocalPreviewInConvert" controls></audio>
+                </div>
+                <div id="vocalSourceUnavailable" class="vocal-info-card warn">
+                    <div class="vocal-info-icon">⚠️</div>
+                    <div class="vocal-info-text">
+                        <p>还没有分离出来的人声</p>
+                        <p class="vocal-info-hint">请先在上方进行「人声分离」</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- 音色选择 -->
         <section class="voice-section">
             <h2>🎭 选择音色（点击卡片选中）</h2>
@@ -151,8 +198,8 @@
                 </div>
                 <div class="setting-item">
                     <label>📁 输出格式</label>
-                    <label><input type="radio" name="format" value="wav"> WAV</label>
-                    <label><input type="radio" name="format" value="mp3" checked> MP3</label>
+                    <label><input type="radio" name="format" value="wav" checked> WAV</label>
+                    <label><input type="radio" name="format" value="mp3"> MP3</label>
                 </div>
             </div>
         </section>

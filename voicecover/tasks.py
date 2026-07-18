@@ -2,11 +2,22 @@ import threading
 import subprocess
 import uuid
 import os
-from config import RVC_DIR, RVC_INFER_CLI, VENV_PYTHON, RVC_WEIGHTS_DIR, RVC_INDICES_DIR, RVC_LOGS_DIR, OUTPUT_DIR, SEPARATION_DIR
+from config import RVC_DIR, RVC_INFER_CLI, VENV_PYTHON, RVC_WEIGHTS_DIR, RVC_INDICES_DIR, RVC_LOGS_DIR, OUTPUT_DIR, SEPARATION_DIR, UPLOAD_DIR
 from utils import preprocess_audio, cleanup_old_files
 from separation import run_separation as _run_separation, separation_store, gpu_lock
 
 task_store = {}
+process_store = {}
+
+
+def cancel_task(task_id):
+    """取消正在运行的转换任务"""
+    proc = process_store.get(task_id)
+    if proc:
+        proc.kill()
+        return True
+    # 进程可能还没启动或已结束
+    return False
 
 
 def run_task(task_id, input_path, model_name, pitch=0, output_format='mp3'):
@@ -18,6 +29,10 @@ def run_task(task_id, input_path, model_name, pitch=0, output_format='mp3'):
             'output_path': None,
             'error': None
         }
+
+        # 如果取消请求已经抢在预处理前到达，直接退出
+        if task_store[task_id].get('status') == 'cancelled':
+            return
 
         processed = input_path.rsplit('.', 1)[0] + '_16k.wav'
         preprocess_audio(input_path, processed)
@@ -54,7 +69,12 @@ def run_task(task_id, input_path, model_name, pitch=0, output_format='mp3'):
             'message': 'AI翻唱中，请稍候...'
         })
 
-        # 获取 GPU 锁：防止与音频分离同时使用显存（RVC 子进程同样占用显存）
+        # 获取 GPU 锁前再检查一次取消
+        if task_store[task_id].get('status') == 'cancelled':
+            if os.path.exists(processed):
+                os.remove(processed)
+            return
+
         task_store[task_id].update({
             'status': 'waiting',
             'progress': 10,
@@ -63,12 +83,26 @@ def run_task(task_id, input_path, model_name, pitch=0, output_format='mp3'):
         if not gpu_lock.acquire(timeout=300):
             raise Exception('等待 GPU 超时（5分钟），请重试')
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, cwd=RVC_DIR)
+            proc = subprocess.Popen(cmd, cwd=RVC_DIR, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process_store[task_id] = proc
+            stdout, stderr = proc.communicate(timeout=1800)
+            result = subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
+            raise
         finally:
+            process_store.pop(task_id, None)
             gpu_lock.release()
 
+        # 子进程结束后如果已被取消，不再覆盖 cancelled 状态
+        if task_store[task_id].get('status') == 'cancelled':
+            if os.path.exists(processed):
+                os.remove(processed)
+            return
+
         if result.returncode != 0:
-            raise Exception(result.stderr)
+            raise Exception(result.stderr.decode('utf-8', errors='replace') if result.stderr else '未知错误')
 
         # 输出格式转换
         final_path = output_path
@@ -96,6 +130,9 @@ def run_task(task_id, input_path, model_name, pitch=0, output_format='mp3'):
         if os.path.exists(processed):
             os.remove(processed)
         cleanup_old_files(OUTPUT_DIR)
+        # 清理旧上传和分离文件
+        cleanup_old_files(UPLOAD_DIR, days=1)
+        cleanup_old_files(SEPARATION_DIR, days=1)
 
     except subprocess.TimeoutExpired:
         task_store[task_id].update({
@@ -104,6 +141,9 @@ def run_task(task_id, input_path, model_name, pitch=0, output_format='mp3'):
             'error': 'timeout'
         })
     except Exception as e:
+        # 防止 cancelled 状态被 except 覆盖
+        if task_store.get(task_id, {}).get('status') == 'cancelled':
+            return
         task_store[task_id].update({
             'status': 'failed',
             'message': f'转换失败: {str(e)}',

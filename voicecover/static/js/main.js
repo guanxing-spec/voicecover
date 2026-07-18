@@ -85,6 +85,8 @@ function resetSeparation() {
     document.getElementById('sepProgressSection').classList.add('hidden');
     document.getElementById('sepResultSection').classList.add('hidden');
     document.getElementById('separateBtn').disabled = true;
+    document.getElementById('separateBtn').textContent = '🎛️ 分离人声与伴奏';
+    updateVocalPanel();
 }
 
 // ===== 音色选择 =====
@@ -97,7 +99,15 @@ function selectVoice(card) {
 
 function updateConvertButton() {
     const btn = document.getElementById('convertBtn');
-    btn.disabled = !(uploadedFile && selectedVoice);
+    if (!selectedVoice) {
+        btn.disabled = true;
+        return;
+    }
+    if (convertSource === 'local') {
+        btn.disabled = !convertUploadedFile;
+    } else {
+        btn.disabled = !separatedVocalPath;
+    }
 }
 
 function updateSeparateButton() {
@@ -231,6 +241,7 @@ function showSeparationResult() {
     instPlayer.src = `/separation-download/${separationTaskId}/inst?_=${ts}`;
     document.getElementById('instDownloadLink').href = `/separation-download/${separationTaskId}/inst?_=${ts}`;
 
+    updateVocalPanel();
     updateConvertButton();
 }
 
@@ -266,6 +277,10 @@ function renderVoices() {
 
 function searchVoices() {
     const query = document.getElementById('searchVoice').value.toLowerCase();
+    if (!query) {
+        renderVoices();
+        return;
+    }
     allCards.forEach(card => {
         const name = card.dataset.name.toLowerCase();
         card.style.display = name.includes(query) ? 'block' : 'none';
@@ -275,7 +290,23 @@ function searchVoices() {
 
 // ===== 开始转换 =====
 async function startConvert() {
-    if (!uploadedFile || !selectedVoice) return;
+    if (!selectedVoice) return;
+
+    // 确定翻唱音源
+    let inputPath;
+    if (convertSource === 'local') {
+        if (!convertUploadedFile) {
+            alert('请先上传翻唱用的音频文件');
+            return;
+        }
+        inputPath = convertUploadedFile.file_path;
+    } else {
+        if (!separatedVocalPath) {
+            alert('还没有分离出来的人声，请先进行人声分离');
+            return;
+        }
+        inputPath = separatedVocalPath;
+    }
 
     // 清理上一次转换的状态
     if (pollInterval) {
@@ -301,16 +332,16 @@ async function startConvert() {
 
     try {
         const formatRadio = document.querySelector('input[name="format"]:checked');
-        const outputFormat = formatRadio ? formatRadio.value : 'mp3';
+        const outputFormat = formatRadio ? formatRadio.value : 'wav';
 
         const res = await fetch('/convert', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                file_path: uploadedFile.file_path,
+                file_path: inputPath,
                 model: selectedVoice,
                 pitch: parseInt(pitch),
-                vocal_path: separatedVocalPath || null,
+                vocal_path: null,
                 format: outputFormat
             })
         });
@@ -395,12 +426,118 @@ function openFolder() {
     alert('成品保存在 voicecover/outputs/ 文件夹中');
 }
 
-function cancelConvert() {
+async function cancelConvert() {
     if (pollInterval) {
         clearInterval(pollInterval);
         pollInterval = null;
     }
+    // 通知后端终止进程
+    if (currentTaskId) {
+        try {
+            await fetch(`/cancel/${currentTaskId}`, { method: 'POST' });
+        } catch (_) {}
+    }
     resetAfterFail();
+}
+
+// ===== 翻唱音源选择 =====
+let convertUploadedFile = null;
+let convertSource = 'local';
+
+function selectConvertSource(source) {
+    convertSource = source;
+    document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
+    if (source === 'local') {
+        document.getElementById('sourceLocalBtn').classList.add('active');
+        document.getElementById('convertLocalPanel').classList.remove('hidden');
+        document.getElementById('convertVocalPanel').classList.add('hidden');
+    } else {
+        document.getElementById('sourceSeparatedBtn').classList.add('active');
+        document.getElementById('convertLocalPanel').classList.add('hidden');
+        document.getElementById('convertVocalPanel').classList.remove('hidden');
+        updateVocalPanel();
+    }
+    updateConvertButton();
+}
+
+function updateVocalPanel() {
+    const available = document.getElementById('vocalSourceAvailable');
+    const unavailable = document.getElementById('vocalSourceUnavailable');
+    if (separatedVocalPath) {
+        available.classList.remove('hidden');
+        unavailable.classList.add('hidden');
+        document.getElementById('vocalPreviewInConvert').src =
+            `/separation-download/${separationTaskId}/vocal?_=${Date.now()}`;
+    } else {
+        available.classList.add('hidden');
+        unavailable.classList.remove('hidden');
+    }
+}
+
+// 翻唱用文件上传
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZone = document.getElementById('convertDropZone');
+    const input = document.getElementById('convertAudioInput');
+    if (!dropZone || !input) return;
+
+    dropZone.addEventListener('click', () => input.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleConvertFile(e.dataTransfer.files[0]);
+    });
+
+    input.addEventListener('change', (e) => {
+        if (e.target.files.length) handleConvertFile(e.target.files[0]);
+    });
+});
+
+async function handleConvertFile(file) {
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+        alert('文件超过 50MB 限制');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('audio', file);
+
+    try {
+        const res = await fetch('/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            convertUploadedFile = data.data;
+            document.getElementById('convertFileName').textContent =
+                `${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
+            document.getElementById('convertFileInfo').classList.remove('hidden');
+            const player = document.getElementById('convertPlayer');
+            player.src = data.data.url;
+            document.getElementById('convertPlayerWrapper').classList.remove('hidden');
+            updateConvertButton();
+        } else {
+            alert('上传失败: ' + data.message);
+        }
+    } catch (err) {
+        alert('上传失败: 网络错误');
+    }
+}
+
+function removeConvertFile() {
+    convertUploadedFile = null;
+    document.getElementById('convertFileInfo').classList.add('hidden');
+    document.getElementById('convertPlayerWrapper').classList.add('hidden');
+    document.getElementById('convertPlayer').src = '';
+    document.getElementById('convertAudioInput').value = '';
+    updateConvertButton();
 }
 
 // ===== 联系作者弹窗 =====

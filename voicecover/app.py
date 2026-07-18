@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file, make_resp
 import os
 from config import UPLOAD_DIR, OUTPUT_DIR, SEPARATION_DIR
 from utils import get_voice_models, cleanup_old_files
-from tasks import start_conversion, get_task_status, start_separation_task, get_separation_task_status
+from tasks import start_conversion, get_task_status, start_separation_task, get_separation_task_status, cancel_task
 
 app = Flask(__name__)
 
@@ -60,7 +60,7 @@ def convert():
     model_name = data.get('model')
     pitch = int(data.get('pitch', 0))
     vocal_path = data.get('vocal_path')
-    output_format = data.get('format', 'mp3').lower()
+    output_format = data.get('format', 'wav').lower()
 
     if not file_path or not model_name:
         return jsonify({'status': 'error', 'message': '缺少参数'}), 400
@@ -142,11 +142,87 @@ def download(task_id):
     if not output_path or not os.path.exists(output_path):
         return jsonify({'status': 'error', 'message': '文件不存在'}), 404
 
-    response = make_response(send_file(output_path, as_attachment=True))
+    # as_attachment=False 让浏览器能直接播放，<a download> 仍可强制下载
+    response = make_response(send_file(output_path, as_attachment=False))
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     return response
+
+
+@app.route('/cancel/<task_id>', methods=['POST'])
+def cancel(task_id):
+    """取消正在运行的翻唱任务"""
+    cancelled = cancel_task(task_id)
+    # 把状态标为已取消（如果还在排队/处理中）
+    from tasks import task_store
+    info = task_store.get(task_id)
+    if info and info.get('status') in ('queued', 'preprocessing', 'converting', 'waiting'):
+        info.update({'status': 'cancelled', 'message': '已取消', 'progress': 0})
+    return jsonify({'status': 'success', 'data': {'cancelled': cancelled}})
+
+
+@app.route('/settings')
+def settings_page():
+    return render_template('settings.html')
+
+
+@app.route('/api/files')
+def list_all_files():
+    def _scan(dir_path, category):
+        items = []
+        if not os.path.isdir(dir_path):
+            return items
+        for fname in os.listdir(dir_path):
+            fpath = os.path.join(dir_path, fname)
+            if os.path.isfile(fpath):
+                st = os.stat(fpath)
+                items.append({
+                    'name': fname,
+                    'path': os.path.abspath(fpath),
+                    'size': st.st_size,
+                    'mtime': st.st_mtime,
+                    'category': category,
+                })
+        items.sort(key=lambda x: x['mtime'], reverse=True)
+        return items
+
+    return jsonify({
+        'status': 'success',
+        'data': {
+            'uploads': _scan(UPLOAD_DIR, 'upload'),
+            'separated': _scan(SEPARATION_DIR, 'separated'),
+            'outputs': _scan(OUTPUT_DIR, 'output'),
+        }
+    })
+
+
+@app.route('/api/files/delete', methods=['POST'])
+def delete_files():
+    data = request.get_json() or {}
+    file_paths = data.get('files', [])
+    allowed = [
+        os.path.abspath(UPLOAD_DIR),
+        os.path.abspath(SEPARATION_DIR),
+        os.path.abspath(OUTPUT_DIR),
+    ]
+
+    deleted, errors = [], []
+    for raw_path in file_paths:
+        real = os.path.abspath(os.path.realpath(raw_path))
+        if not any(real.startswith(base + os.sep) or real == base for base in allowed):
+            errors.append({'path': raw_path, 'error': '路径不允许'})
+            continue
+        if not os.path.exists(real):
+            errors.append({'path': raw_path, 'error': '文件不存在'})
+            continue
+        try:
+            os.remove(real)
+            deleted.append(raw_path)
+        except Exception as e:
+            errors.append({'path': raw_path, 'error': str(e)})
+
+    return jsonify({'status': 'success', 'data': {'deleted': deleted, 'errors': errors}})
 
 
 @app.route('/cleanup', methods=['POST'])

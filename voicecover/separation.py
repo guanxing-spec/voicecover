@@ -6,7 +6,8 @@ import numpy as np
 import soundfile as sf
 from demucs.pretrained import get_model
 from demucs.apply import apply_model
-from config import MODELS_DIR
+from config import MODELS_DIR, UPLOAD_DIR, SEPARATION_DIR
+from utils import cleanup_old_files
 
 # GPU 互斥锁：防止分离和翻唱同时加载模型到显存
 # 任何 GPU 操作（包括子进程 RVC 推理）必须先获取此锁
@@ -213,6 +214,10 @@ def run_separation(task_id, input_path, separation_dir, model_type='htdemucs', o
             'vocal_path': vocal_path,
             'inst_path': inst_path,
         })
+
+        # 清理旧上传文件和分离文件（分离文件保留1天供下载）
+        cleanup_old_files(UPLOAD_DIR, days=7)
+        cleanup_old_files(SEPARATION_DIR, days=1)
 
     except Exception as e:
         gc.collect()
