@@ -9,6 +9,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.11%2Bcu128-EE4C2C?logo=pytorch&logoColor=white)](#技术栈)
 [![RVC](https://img.shields.io/badge/Engine-RVC%20v2-4B8BBE)](#技术栈)
 [![Offline](https://img.shields.io/badge/Runtime-100%25%20Offline-2ea44f)](#项目特点)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](#许可证)
 
 上传歌曲 → 分离人声与伴奏 → 选择音色 → 生成翻唱成品。  
 全程在本机 GPU 上运行，不上传云端、不调用任何在线 API。
@@ -32,6 +33,7 @@
 - [常见问题](#常见问题)
 - [已知限制](#已知限制)
 - [致谢](#致谢)
+- [许可证](#许可证)
 
 ---
 
@@ -307,4 +309,9 @@ PyTorch 2.6 起 `torch.load` 默认变为 `weights_only=True`。[RVC/run_infer.p
 - Kim Vocal 2 / Mel-Band-RoFormer 模型作者——高质量人声分离模型；
 - Flask、PyTorch 及所有依赖库的维护者。
 
-第三方组件的许可证以其各自仓库为准。本项目代码暂未单独声明开源许可证。
+第三方组件的许可证以其各自仓库为准。
+
+## 许可证
+
+本项目代码采用 [MIT License](LICENSE) 开源。  
+RVC、Demucs、audio-separator 等第三方组件遵循其各自仓库的许可证；音色模型与分离模型的版权归原作者所有，使用前请自行确认授权范围。
