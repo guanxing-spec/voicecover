@@ -1,5 +1,5 @@
 @echo off
-cd /d "e:\VS_code_project\voicecover"
+cd /d "%~dp0"
 call venv\Scripts\activate
 start http://localhost:5000
 python app.py

@@ -1,3 +1,38 @@
-flask>=3.0
-flask-cors>=4.0
-python-docx>=1.0
+# PyTorch 需按本机 CUDA 版本单独安装（示例为 CUDA 12.8）：
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+
+# ===== Web 服务 =====
+flask>=3.1
+flask-cors>=6.0
+python-docx>=1.2
+
+# ===== 人声分离 =====
+demucs>=4.1
+audio-separator>=0.44
+soundfile>=0.14
+numpy>=2.2
+scipy>=1.15
+librosa>=0.11
+PyYAML>=6.0
+onnxruntime>=1.23
+
+# ===== RVC 推理（由 RVC/run_infer.py 调用）=====
+Cython>=3.2
+fairseq==0.12.2
+faiss-cpu>=1.14
+pyworld>=0.3.5
+praat-parselmouth>=0.4.7
+torchcrepe>=0.0.24
+torchfcpe>=0.0.4
+av>=17.0
+ffmpeg-python>=0.2
+pydub>=0.25
+resampy>=0.4
+numba>=0.66
+tqdm>=4.68
+python-dotenv>=1.2
+safetensors>=0.8
+einops>=0.8
+omegaconf>=2.0.6
+beartype>=0.18
+rotary-embedding-torch>=0.6.5
